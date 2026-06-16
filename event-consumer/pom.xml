@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.eventpof</groupId>
+        <artifactId>event-pof</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>event-consumer</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.micronaut.platform</groupId>
+                <artifactId>micronaut-platform</artifactId>
+                <version>${micronaut.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.eventpof</groupId>
+            <artifactId>event-common</artifactId>
+        </dependency>
+
+        <!-- Micronaut core -->
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-http-server-netty</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-inject</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut.validation</groupId>
+            <artifactId>micronaut-validation</artifactId>
+        </dependency>
+
+        <!-- Micronaut Kafka -->
+        <dependency>
+            <groupId>io.micronaut.kafka</groupId>
+            <artifactId>micronaut-kafka</artifactId>
+        </dependency>
+
+        <!-- Micronaut Data MongoDB (replaces manual driver wrapper) -->
+        <dependency>
+            <groupId>io.micronaut.data</groupId>
+            <artifactId>micronaut-data-mongodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-sync</artifactId>
+        </dependency>
+
+        <!-- Micronaut management / metrics -->
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-management</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut.micrometer</groupId>
+            <artifactId>micronaut-micrometer-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut.micrometer</groupId>
+            <artifactId>micronaut-micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Jackson -->
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- Observability -->
+        <dependency>
+            <groupId>com.github.loki4j</groupId>
+            <artifactId>loki-logback-appender</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>io.micronaut.test</groupId>
+            <artifactId>micronaut-test-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mongodb</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.2.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>21</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>io.micronaut</groupId>
+                            <artifactId>micronaut-inject-java</artifactId>
+                            <version>${micronaut.version}</version>
+                        </path>
+                        <path>
+                            <groupId>io.micronaut.validation</groupId>
+                            <artifactId>micronaut-validation-processor</artifactId>
+                            <version>4.8.0</version>
+                        </path>
+                        <path>
+                            <groupId>io.micronaut.data</groupId>
+                            <artifactId>micronaut-data-document-processor</artifactId>
+                            <version>4.10.5</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.micronaut.maven</groupId>
+                <artifactId>micronaut-maven-plugin</artifactId>
+                <version>4.6.3</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <id>default-start-testresources-service</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>default-stop-testresources-service</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

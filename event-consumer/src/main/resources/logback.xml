@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"event-consumer"}</customFields>
+        </encoder>
+    </appender>
+
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_URL:-http://localhost:3100}/loki/api/v1/push</url>
+        </http>
+        <format>
+            <label>
+                <pattern>app=event-consumer,level=%level</pattern>
+            </label>
+            <message>
+                <pattern>level=%level service=event-consumer %logger{36} - %msg%n</pattern>
+            </message>
+        </format>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOKI"/>
+    </root>
+
+    <logger name="com.eventpof" level="DEBUG"/>
+    <logger name="io.micronaut.configuration.kafka" level="WARN"/>
+</configuration>

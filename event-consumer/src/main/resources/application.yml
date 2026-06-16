@@ -1,0 +1,51 @@
+micronaut:
+  application:
+    name: event-consumer
+  server:
+    port: 8081
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true
+  endpoints:
+    prometheus:
+      sensitive: false
+    health:
+      sensitive: false
+      details-visible: ANONYMOUS
+
+mongodb:
+  uri: ${MONGODB_URI:`mongodb://admin:password@localhost:27017/eventpof?authSource=admin`}
+  database: eventpof
+
+kafka:
+  bootstrap:
+    servers: ${KAFKA_BOOTSTRAP_SERVERS:`localhost:9092`}
+  consumer:
+    group-id: event-consumer-group
+    auto:
+      offset:
+        reset: earliest
+  topics:
+    events: events.domain
+  producers:
+    default:
+      key:
+        serializer: org.apache.kafka.common.serialization.StringSerializer
+      value:
+        serializer: io.micronaut.configuration.kafka.serde.JsonObjectSerde
+  consumers:
+    default:
+      key:
+        deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value:
+        deserializer: io.micronaut.configuration.kafka.serde.JsonObjectSerde
+
+logger:
+  levels:
+    com.eventpof: DEBUG
+    io.micronaut.configuration.kafka: WARN
+    io.micronaut.data: DEBUG

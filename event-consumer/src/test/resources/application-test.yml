@@ -1,0 +1,14 @@
+micronaut:
+  server:
+    port: -1
+
+kafka:
+  consumer:
+    group-id: event-consumer-test-group
+  topics:
+    events: events.domain
+
+logger:
+  levels:
+    com.eventpof: DEBUG
+    io.micronaut.configuration.kafka: WARN

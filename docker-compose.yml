@@ -1,0 +1,153 @@
+version: '3.9'
+
+services:
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - eventpof-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_JMX_PORT: 9101
+    networks:
+      - eventpof-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "9080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - eventpof-net
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: eventpof
+    volumes:
+      - mongo-data:/data/db
+      - ./infra/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - eventpof-net
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: mongo-express
+    depends_on:
+      - mongodb
+    ports:
+      - "8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
+      ME_CONFIG_BASICAUTH: "false"
+    networks:
+      - eventpof-net
+
+  # ── Observability ──────────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.7
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - eventpof-net
+
+  promtail:
+    image: grafana/promtail:2.9.7
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - ./infra/promtail/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - eventpof-net
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - eventpof-net
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - eventpof-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.14.0
+    container_name: logstash
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./infra/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./infra/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+    networks:
+      - eventpof-net
+
+volumes:
+  mongo-data:
+  loki-data:
+  grafana-data:
+
+networks:
+  eventpof-net:
+    driver: bridge

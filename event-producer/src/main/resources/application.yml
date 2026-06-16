@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: event-producer
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://admin:password@localhost:27017/eventpof?authSource=admin}
+      database: eventpof
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+kafka:
+  topics:
+    events: events.domain
+
+inbox:
+  relay:
+    interval-ms: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.eventpof: DEBUG

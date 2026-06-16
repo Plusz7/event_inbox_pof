@@ -1,0 +1,16 @@
+spring:
+  data:
+    mongodb:
+      database: eventpof-test
+
+kafka:
+  topics:
+    events: events.domain
+
+inbox:
+  relay:
+    interval-ms: 99999999
+
+logging:
+  level:
+    com.eventpof: DEBUG
