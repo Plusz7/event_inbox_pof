@@ -3,6 +3,7 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <springProperty scope="context" name="appName" source="spring.application.name"/>
+    <property name="LOKI_URL" value="${LOKI_URL:-http://localhost:3100}"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
@@ -12,7 +13,7 @@
 
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
-            <url>${LOKI_URL:http://localhost:3100}/loki/api/v1/push</url>
+            <url>${LOKI_URL}/loki/api/v1/push</url>
         </http>
         <format>
             <label>
