@@ -40,10 +40,6 @@ public class InboxEvent {
                 .build();
     }
 
-    public void markInProgress() {
-        this.status = InboxEventStatus.IN_PROGRESS;
-    }
-
     public void markPublished() {
         this.status = InboxEventStatus.PUBLISHED;
         this.publishedAt = Instant.now();

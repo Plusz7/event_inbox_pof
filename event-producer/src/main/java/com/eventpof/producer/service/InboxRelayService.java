@@ -47,23 +47,11 @@ public class InboxRelayService {
         }
     }
 
-    /**
-     * Atomically claims one PENDING event by flipping its status to IN_PROGRESS.
-     * Only one instance across the cluster will receive any given event.
-     */
+    // Atomically claims one PENDING event — only one cluster instance will receive any given event
     private InboxEvent claimNextPending() {
-        Query query = new Query(where("status").is(InboxEventStatus.PENDING))
-                .limit(1);
-        query.fields().include("_id", "eventKey", "payload", "status", "retryCount", "createdAt", "lastError");
-
+        Query query = new Query(where("status").is(InboxEventStatus.PENDING)).limit(1);
         Update update = new Update().set("status", InboxEventStatus.IN_PROGRESS);
-
-        return mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                InboxEvent.class
-        );
+        return mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), InboxEvent.class);
     }
 
     private void process(InboxEvent event) {
@@ -73,6 +61,10 @@ public class InboxRelayService {
                     .get();
             event.markPublished();
             log.info("Inbox event relayed: id={}, key={}", event.getId(), event.getEventKey());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.error("Relay interrupted for event: id={}", event.getId(), ex);
+            applyFailure(event, "Relay thread interrupted");
         } catch (ExecutionException ex) {
             if (ex.getCause() instanceof TimeoutException) {
                 log.error("Kafka publish timed out after {}s: id={}", PUBLISH_TIMEOUT_SECONDS, event.getId());
@@ -81,9 +73,6 @@ public class InboxRelayService {
                 log.error("Failed to relay inbox event: id={}, attempt={}", event.getId(), event.getRetryCount(), ex);
                 applyFailure(event, ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
             }
-        } catch (Exception ex) {
-            log.error("Failed to relay inbox event: id={}, attempt={}", event.getId(), event.getRetryCount(), ex);
-            applyFailure(event, ex.getMessage());
         }
         inboxEventRepository.save(event);
     }

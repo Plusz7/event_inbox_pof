@@ -23,7 +23,7 @@ public class EventIngestionService {
             log.warn("Duplicate event key detected: {}", request.eventKey());
             return inboxEventRepository.findByEventKey(request.eventKey())
                     .map(InboxEvent::getId)
-                    .orElseThrow();
+                    .orElseThrow(() -> new IllegalStateException("Inbox event not found for key: " + request.eventKey()));
         }
 
         String correlationId = request.correlationId() != null
