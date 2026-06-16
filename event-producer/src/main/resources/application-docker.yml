@@ -1,0 +1,8 @@
+spring:
+  mongodb:
+    uri: mongodb://admin:password@mongodb:27017/eventpof?authSource=admin
+  data:
+    mongodb:
+      uri: mongodb://admin:password@mongodb:27017/eventpof?authSource=admin
+  kafka:
+    bootstrap-servers: kafka:29092
