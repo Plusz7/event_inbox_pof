@@ -46,6 +46,42 @@ services:
     networks:
       - eventpof-net
 
+  # ── Applications ───────────────────────────────────────────────────────────
+  event-producer:
+    build:
+      context: ./event-producer
+    container_name: event-producer
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      LOKI_URL: http://loki:3100
+    depends_on:
+      - kafka
+      - mongodb
+    networks:
+      - eventpof-net
+
+  event-consumer:
+    build:
+      context: ./event-consumer
+    container_name: event-consumer
+    ports:
+      - "8081:8081"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/eventpof?authSource=admin
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      LOKI_URL: http://loki:3100
+      MICRONAUT_SERVER_PORT: 8081
+      ENDPOINTS_ALL_SENSITIVE: "false"
+      ENDPOINTS_PROMETHEUS_SENSITIVE: "false"
+      ENDPOINTS_ALL_ENABLED: "true"
+    depends_on:
+      - kafka
+      - mongodb
+    networks:
+      - eventpof-net
+
   # ── MongoDB ────────────────────────────────────────────────────────────────
   mongodb:
     image: mongo:7.0

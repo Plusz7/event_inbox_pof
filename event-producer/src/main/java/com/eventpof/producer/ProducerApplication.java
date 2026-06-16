@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 public class ProducerApplication {
-    static void main(String[] args) {
+    public static void main(String[] args) {
         SpringApplication.run(ProducerApplication.class, args);
     }
 }

@@ -10,12 +10,6 @@ micronaut:
         enabled: true
         step: PT1M
         descriptions: true
-  endpoints:
-    prometheus:
-      sensitive: false
-    health:
-      sensitive: false
-      details-visible: ANONYMOUS
 
 mongodb:
   uri: ${MONGODB_URI:`mongodb://admin:password@localhost:27017/eventpof?authSource=admin`}
@@ -43,6 +37,18 @@ kafka:
         deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value:
         deserializer: io.micronaut.configuration.kafka.serde.JsonObjectSerde
+
+endpoints:
+  all:
+    enabled: true
+    sensitive: false
+  prometheus:
+    enabled: true
+    sensitive: false
+  health:
+    enabled: true
+    sensitive: false
+    details-visible: ANONYMOUS
 
 logger:
   levels:

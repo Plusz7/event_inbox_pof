@@ -3,8 +3,6 @@ package com.eventpof.producer.service;
 import com.eventpof.common.dto.EventRequest;
 import com.eventpof.producer.domain.inbox.InboxEvent;
 import com.eventpof.producer.domain.inbox.InboxEventRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,18 +26,15 @@ class EventIngestionServiceTest {
     @InjectMocks
     private EventIngestionService ingestionService;
 
-    private final ObjectMapper mapper = new ObjectMapper();
-
     @Test
     void shouldSaveEventToInbox() {
-        ObjectNode data = mapper.createObjectNode().put("value", "test");
         EventRequest request = EventRequest.builder()
                 .eventKey("key-001")
                 .eventType("ORDER_CREATED")
                 .createdBy("user@example.com")
                 .sourceSystem("order-service")
                 .correlationId("corr-123")
-                .data(data)
+                .data(Map.of("value", "test"))
                 .build();
 
         InboxEvent savedEvent = InboxEvent.builder().id("inbox-id-1").eventKey("key-001").build();
@@ -56,13 +52,12 @@ class EventIngestionServiceTest {
 
     @Test
     void shouldReturnExistingInboxIdForDuplicateKey() {
-        ObjectNode data = mapper.createObjectNode();
         EventRequest request = EventRequest.builder()
                 .eventKey("dup-key")
                 .eventType("TEST")
                 .createdBy("user")
                 .sourceSystem("src")
-                .data(data)
+                .data(Map.of())
                 .build();
 
         InboxEvent existing = InboxEvent.builder().id("existing-id").eventKey("dup-key").build();
@@ -77,13 +72,12 @@ class EventIngestionServiceTest {
 
     @Test
     void shouldGenerateCorrelationIdWhenNotProvided() {
-        ObjectNode data = mapper.createObjectNode();
         EventRequest request = EventRequest.builder()
                 .eventKey("key-no-corr")
                 .eventType("TEST")
                 .createdBy("user")
                 .sourceSystem("src")
-                .data(data)
+                .data(Map.of())
                 .build();
 
         InboxEvent savedEvent = InboxEvent.builder().id("id-no-corr").eventKey("key-no-corr").build();

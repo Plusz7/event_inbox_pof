@@ -65,6 +65,12 @@
             <artifactId>mongodb-driver-sync</artifactId>
         </dependency>
 
+        <!-- Reactor (required by micronaut-micrometer-registry-prometheus) -->
+        <dependency>
+            <groupId>io.micronaut.reactor</groupId>
+            <artifactId>micronaut-reactor</artifactId>
+        </dependency>
+
         <!-- Micronaut management / metrics -->
         <dependency>
             <groupId>io.micronaut</groupId>
@@ -196,6 +202,9 @@
                 <artifactId>micronaut-maven-plugin</artifactId>
                 <version>4.6.3</version>
                 <extensions>true</extensions>
+                <configuration>
+                    <micronautAotEnabled>false</micronautAotEnabled>
+                </configuration>
                 <executions>
                     <execution>
                         <id>default-start-testresources-service</id>
@@ -204,6 +213,52 @@
                     <execution>
                         <id>default-stop-testresources-service</id>
                         <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>default-aot-analysis</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.eventpof.consumer.ConsumerApplication</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.eventpof.consumer.ConsumerApplication</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

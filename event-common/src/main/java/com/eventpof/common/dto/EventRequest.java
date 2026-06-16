@@ -1,9 +1,10 @@
 package com.eventpof.common.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
+
+import java.util.Map;
 
 @Builder
 public record EventRequest(
@@ -12,5 +13,5 @@ public record EventRequest(
         @NotBlank String createdBy,
         @NotBlank String sourceSystem,
         String correlationId,
-        @NotNull JsonNode data
+        @NotNull Map<String, Object> data
 ) {}

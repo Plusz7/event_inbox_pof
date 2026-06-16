@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -28,6 +29,7 @@ import static org.awaitility.Awaitility.await;
  */
 @MicronautTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class KafkaEventConsumerIntegrationTest implements TestPropertyProvider {
 
     // Declared without @Container — we control lifecycle via getProperties()

@@ -84,6 +84,7 @@
                         <release>21</release>
                         <compilerArgs>
                             <arg>--enable-preview</arg>
+                            <arg>-parameters</arg>
                         </compilerArgs>
                         <enablePreview>true</enablePreview>
                     </configuration>

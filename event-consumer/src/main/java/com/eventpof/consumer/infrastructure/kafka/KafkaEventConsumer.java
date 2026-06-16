@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @KafkaListener(
-        groupId = "${kafka.consumer.group-id}",
+        groupId = "${kafka.consumer.group-id:event-consumer-group}",
         offsetReset = OffsetReset.EARLIEST,
         offsetStrategy = OffsetStrategy.AUTO,
         errorStrategy = @ErrorStrategy(
@@ -33,7 +33,7 @@ public class KafkaEventConsumer implements KafkaListenerExceptionHandler {
         this.dltEventProducer = dltEventProducer;
     }
 
-    @Topic("${kafka.topics.events}")
+    @Topic("${kafka.topics.events:events.domain}")
     public void consume(
             @KafkaKey String key,
             EventPayload payload,
