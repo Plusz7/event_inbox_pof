@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -27,6 +28,10 @@ public class InboxRelayService {
     private static final int MAX_RETRY = 3;
     private static final int BATCH_SIZE = 10;
     private static final long PUBLISH_TIMEOUT_SECONDS = 5L;
+    // exponential backoff: retry 1 → 30s, retry 2 → 120s, retry 3 → 480s
+    private static final long BACKOFF_BASE_SECONDS = 30L;
+    // events stuck in IN_PROGRESS longer than this are considered dead
+    private static final long STUCK_THRESHOLD_SECONDS = 60L;
 
     private final InboxEventRepository inboxEventRepository;
     private final KafkaEventPublisher kafkaEventPublisher;
@@ -47,10 +52,41 @@ public class InboxRelayService {
         }
     }
 
+    // Resets events stuck in IN_PROGRESS — e.g. app crashed mid-publish
+    @Scheduled(fixedDelay = 600_000)
+    public void resetStuckEvents() {
+        Instant stuckThreshold = Instant.now().minusSeconds(STUCK_THRESHOLD_SECONDS);
+
+        Update update = new Update()
+                .set("status", InboxEventStatus.PENDING)
+                .set("nextRetryAt", Instant.now())
+                .set("updatedAt", Instant.now())
+                .inc("retryCount", 1)
+                .set("lastError", "reset by stuck-event detector");
+
+        var result = mongoTemplate.updateMulti(
+                new Query(where("status").is(InboxEventStatus.IN_PROGRESS)
+                        .and("updatedAt").lte(stuckThreshold)),
+                update,
+                InboxEvent.class
+        );
+
+        if (result.getModifiedCount() > 0) {
+            log.warn("Stuck-event detector reset {} events from IN_PROGRESS to PENDING", result.getModifiedCount());
+        }
+    }
+
     // Atomically claims one PENDING event — only one cluster instance will receive any given event
     private InboxEvent claimNextPending() {
-        Query query = new Query(where("status").is(InboxEventStatus.PENDING)).limit(1);
-        Update update = new Update().set("status", InboxEventStatus.IN_PROGRESS);
+        Query query = new Query(
+                where("status").is(InboxEventStatus.PENDING)
+                        .and("nextRetryAt").lte(Instant.now())
+        ).limit(1);
+
+        Update update = new Update()
+                .set("status", InboxEventStatus.IN_PROGRESS)
+                .set("updatedAt", Instant.now());
+
         return mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), InboxEvent.class);
     }
 
@@ -80,7 +116,15 @@ public class InboxRelayService {
     private void applyFailure(InboxEvent event, String error) {
         event.markFailed(error);
         if (event.getRetryCount() < MAX_RETRY) {
-            event.resetToPending();
+            // exponential backoff: 30s, 120s, 480s
+            long backoffSeconds = BACKOFF_BASE_SECONDS * (long) Math.pow(4, event.getRetryCount() - 1);
+            Instant nextRetry = Instant.now().plusSeconds(backoffSeconds);
+            event.scheduleRetry(nextRetry);
+            log.warn("Inbox event scheduled for retry: id={}, attempt={}, nextRetryAt={}",
+                    event.getId(), event.getRetryCount(), nextRetry);
+        } else {
+            log.error("Inbox event permanently failed after {} attempts: id={}, lastError={}",
+                    MAX_RETRY, event.getId(), error);
         }
     }
 }

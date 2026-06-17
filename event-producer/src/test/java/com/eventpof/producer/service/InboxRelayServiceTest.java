@@ -39,7 +39,6 @@ class InboxRelayServiceTest {
     @Test
     void shouldPublishPendingEventsAndMarkAsPublished() {
         InboxEvent event = buildPendingEvent("key-1");
-        // first call returns the event (claimed), second call returns null (no more pending)
         when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
                 .thenReturn(event)
                 .thenReturn(null);
@@ -53,7 +52,7 @@ class InboxRelayServiceTest {
     }
 
     @Test
-    void shouldMarkEventAsFailedOnPublishError() {
+    void shouldScheduleRetryWithBackoffOnPublishError() {
         InboxEvent event = buildPendingEvent("key-fail");
         when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
                 .thenReturn(event)
@@ -66,16 +65,18 @@ class InboxRelayServiceTest {
 
         assertThat(event.getRetryCount()).isEqualTo(1);
         assertThat(event.getStatus()).isEqualTo(InboxEventStatus.PENDING);
+        assertThat(event.getNextRetryAt()).isAfter(Instant.now());
         verify(inboxEventRepository).save(event);
     }
 
     @Test
     void shouldLeaveEventFailedAfterMaxRetries() {
         InboxEvent event = buildPendingEvent("key-max");
-        event.markFailed("err");
-        event.markFailed("err");
-        event.markFailed("err");
-        event.resetToPending();
+        // simulate 3 previous failures
+        event.markFailed("err1");
+        event.markFailed("err2");
+        event.markFailed("err3");
+        event.scheduleRetry(Instant.now());
 
         when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
                 .thenReturn(event)
@@ -100,19 +101,32 @@ class InboxRelayServiceTest {
         verify(inboxEventRepository, never()).save(any());
     }
 
+    @Test
+    void shouldResetStuckInProgressEvents() {
+        when(mongoTemplate.updateMulti(any(), any(), eq(InboxEvent.class)))
+                .thenReturn(mock(com.mongodb.client.result.UpdateResult.class));
+
+        relayService.resetStuckEvents();
+
+        verify(mongoTemplate).updateMulti(any(), any(), eq(InboxEvent.class));
+    }
+
     private InboxEvent buildPendingEvent(String key) {
         EventPayload payload = EventPayload.builder()
                 .eventKey(key)
                 .eventType("TEST")
                 .auditData(AuditData.of("user", "corr", "src"))
                 .build();
+        Instant now = Instant.now();
         return InboxEvent.builder()
                 .id("id-" + key)
                 .eventKey(key)
                 .payload(payload)
                 .status(InboxEventStatus.PENDING)
                 .retryCount(0)
-                .createdAt(Instant.now())
+                .createdAt(now)
+                .updatedAt(now)
+                .nextRetryAt(now)
                 .build();
     }
 }

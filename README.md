@@ -258,14 +258,42 @@ src/main/java/com/eventpof/consumer/
 
 ### Producer side (Inbox → Kafka)
 
+Dwie niezależne warstwy retry — każda obsługuje inny rodzaj błędu:
+
+**Warstwa 1 — Kafka producer retry** (ms–sekundy, chwilowe błędy sieci):
 ```
-attempt 1 ──► Kafka (timeout 5 s)
-    fail → attempt 2 (next scheduler tick, ~5 s later)
-    fail → attempt 3
-    fail → status=FAILED
+Kafka producer: retries=3, retry.backoff.ms=1000, acks=all, enable.idempotence=true
 ```
 
-Kafka producer: `retries=3, retry.backoff.ms=1000, acks=all, enable.idempotence=true`.
+**Warstwa 2 — Inbox exponential backoff** (sekundy–minuty, długie awarie):
+```
+attempt 1 → fail → PENDING, nextRetryAt: now + 30s
+attempt 2 → fail → PENDING, nextRetryAt: now + 120s
+attempt 3 → fail → PENDING, nextRetryAt: now + 480s
+attempt 4 → fail → FAILED (permanentnie)
+```
+
+`claimNextPending()` uwzględnia `nextRetryAt` — event nie jest podjęty przed upływem backoffu:
+```java
+where("status").is(PENDING).and("nextRetryAt").lte(Instant.now())
+```
+
+**Warstwa 3 — Stuck event detector** (co 10 min, ochrona przed crashem):
+
+Jeśli aplikacja crashuje w trakcie `process()`, event zostaje w `IN_PROGRESS` na zawsze.
+Osobny scheduler resetuje takie eventy z powrotem do `PENDING`:
+```
+find { status: IN_PROGRESS, updatedAt < 60s ago }
+→ reset to PENDING, retryCount++
+```
+
+`InboxEvent` status machine:
+```
+PENDING ──► IN_PROGRESS ──► PUBLISHED
+                │
+                └──► PENDING (retry < 4, z backoffem)
+                └──► FAILED  (retry = 4, permanentnie)
+```
 
 ### Consumer side (Kafka → processing)
 
@@ -301,7 +329,7 @@ Integration tests use `TestPropertyProvider` — Micronaut-idiomatic pattern tha
 | Test class | Type | What it covers |
 |---|---|---|
 | `EventIngestionServiceTest` | Unit (Mockito) | Idempotency, auditData creation, correlationId generation |
-| `InboxRelayServiceTest` | Unit (Mockito) | Publish success, failure, retry boundary, empty inbox |
+| `InboxRelayServiceTest` | Unit (Mockito) | Publish success, backoff on failure, max retry boundary, empty inbox, stuck detector |
 | `EventProcessorServiceTest` | Unit (Mockito) | Process new event, skip duplicate, DLT save, DLT dedup |
 | `KafkaEventConsumerIntegrationTest` | Integration (TestContainers) | E2E consume, duplicate skip, DLT routing |
 
