@@ -3,6 +3,20 @@
 Event-driven proof of concept using the **Inbox Pattern** over Apache Kafka.
 Two independent services share a common domain library and communicate exclusively through Kafka topics.
 
+### Stack
+
+| | |
+|---|---|
+| **Languages** | Java 21 (preview features), Maven 3.9 |
+| **event-producer** | Spring Boot 4.1 · Spring Data MongoDB · Spring Kafka · Micrometer |
+| **event-consumer** | Micronaut 4.7 · Micronaut Data MongoDB · Micronaut Kafka · Micrometer |
+| **Messaging** | Apache Kafka 7.6 (Confluent) · Zookeeper |
+| **Persistence** | MongoDB 7.0 |
+| **Observability** | Prometheus · Grafana 10.4 · Loki 2.9 · Promtail · Logstash 8.14 |
+| **Logging** | Loki4j appender · Logstash JSON encoder |
+| **Testing** | JUnit 5 · Mockito · TestContainers |
+| **Packaging** | Docker · Docker Compose · Spring Boot fat JAR · maven-shade-plugin |
+
 ---
 
 ## Architecture
