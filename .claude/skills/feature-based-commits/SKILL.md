@@ -1,6 +1,6 @@
 ---
 name: feature-based-commits
-description: How to structure commits and pull requests as small, atomic, feature-scoped units instead of one giant commit or PR with thousands of unrelated changed lines. Covers commit message conventions and how to split an already-large uncommitted diff. Use this whenever about to commit multiple changes, when a diff spans more than one logical concern, when preparing a pull request, or when the user asks how to organize or split their changes.
+description: How to branch and structure commits/pull requests as small, atomic, feature-scoped units instead of one giant commit or PR with thousands of unrelated changed lines. Covers when and how to create a new branch per feature or fix, branch naming, commit message conventions, and how to split an already-large uncommitted diff. Use this whenever starting a new feature or fix, about to commit multiple changes, when a diff spans more than one logical concern, when preparing a pull request, or when the user asks how to organize or split their changes.
 metadata:
   category: workflow
 ---
@@ -8,6 +8,18 @@ metadata:
 # Feature-Based Commits
 
 A single commit (or PR) that bundles five unrelated changes forces every future reader — a reviewer, `git blame`, whoever bisects a regression six months from now — to untangle which lines belong to which change. Splitting by feature/concern up front costs a few minutes now and saves that untangling for everyone who touches this history later.
+
+## Branch per feature or fix
+
+Start each piece of work — a feature, a bug fix, a refactor — on its own branch, cut from the up-to-date default branch (`main`/`master`/`develop`, whatever this repo uses). Don't commit directly to the default branch and don't pile unrelated work onto a branch that already has an open PR for something else. This is what makes atomic commits actually pay off downstream: a branch that maps to exactly one concern can be reviewed, tested, merged, and reverted independently — a branch mixing three concerns forces the same all-or-nothing bottleneck that oversized commits do, just one level up.
+
+- **Before branching**, make sure the base is current (`git pull` / `git fetch` + rebase or merge) so the new branch doesn't start from stale history — this avoids painful conflicts later and keeps the diff focused on the actual change instead of also including catch-up noise from the base branch.
+- **Naming**: a short, descriptive, kebab-case name that says what the branch is for, optionally prefixed by type and/or ticket id: `feat/discount-codes`, `fix/checkout-rounding-error`, `chore/bump-eslint`, or `JIRA-123-discount-codes` if the team keys work off ticket IDs. Avoid generic names like `patch`, `updates`, or your own username — six branches named `dave-fixes` are indistinguishable in a branch list.
+- **One branch, one concern.** If, mid-branch, you find an unrelated bug worth fixing, don't fix it here — branch off the base again for that fix so it can ship and be reviewed on its own (see `feature-based-commits`' PR-sizing guidance below), then return to the original branch.
+- **Keep it short-lived.** A branch that lives for weeks drifts further from the base every day, making the eventual merge harder and the diff harder to review. Prefer smaller branches merged sooner over one branch accumulating a feature's entire scope.
+- **Before opening a PR**, sync with the base again (rebase or merge) so the diff shown for review is just this branch's actual changes, not also a pile of unrelated commits the base picked up in the meantime.
+
+If a task's scope is genuinely ambiguous — is this one feature or several? — err toward more, smaller branches; splitting a branch that turned out to be too broad is easy, but a branch that grew into three unrelated concerns is hard to untangle after the fact without redoing the git history work described below.
 
 ## What "atomic" means here
 
