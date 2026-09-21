@@ -1,8 +1,8 @@
 package com.eventpof.producer.api;
 
 import com.eventpof.common.dto.EventRequest;
-import com.eventpof.producer.domain.inbox.InboxEvent;
-import com.eventpof.producer.domain.inbox.InboxEventStatus;
+import com.eventpof.producer.domain.outbox.OutboxEvent;
+import com.eventpof.producer.domain.outbox.OutboxEventStatus;
 import com.eventpof.producer.service.EventIngestionService;
 import com.eventpof.producer.service.EventStatusService;
 import jakarta.validation.Valid;
@@ -27,25 +27,25 @@ public class EventController {
     @PostMapping
     public ResponseEntity<EventAcceptedResponse> publishEvent(@Valid @RequestBody EventRequest request) {
         log.info("Received event request: key={}, type={}", request.eventKey(), request.eventType());
-        String inboxId = ingestionService.ingest(request);
+        String outboxId = ingestionService.ingest(request);
         return ResponseEntity
                 .status(HttpStatus.ACCEPTED)
-                .body(new EventAcceptedResponse(inboxId, request.eventKey(), "Event accepted for processing"));
+                .body(new EventAcceptedResponse(outboxId, request.eventKey(), "Event accepted for processing"));
     }
 
-    @GetMapping("/{inboxId}/status")
-    public ResponseEntity<?> getEventStatus(@PathVariable String inboxId) {
-        return statusService.findById(inboxId)
+    @GetMapping("/{outboxId}/status")
+    public ResponseEntity<?> getEventStatus(@PathVariable String outboxId) {
+        return statusService.findById(outboxId)
                 .<ResponseEntity<?>>map(event -> ResponseEntity.ok(toStatusResponse(event)))
                 .orElseGet(() -> {
                     ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
                     problem.setTitle("Event not found");
-                    problem.setDetail("No inbox event found for id: " + inboxId);
+                    problem.setDetail("No outbox event found for id: " + outboxId);
                     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
                 });
     }
 
-    private EventStatusResponse toStatusResponse(InboxEvent event) {
+    private EventStatusResponse toStatusResponse(OutboxEvent event) {
         return new EventStatusResponse(
                 event.getId(),
                 event.getEventKey(),
@@ -57,12 +57,12 @@ public class EventController {
         );
     }
 
-    public record EventAcceptedResponse(String inboxId, String eventKey, String message) {}
+    public record EventAcceptedResponse(String outboxId, String eventKey, String message) {}
 
     public record EventStatusResponse(
-            String inboxId,
+            String outboxId,
             String eventKey,
-            InboxEventStatus status,
+            OutboxEventStatus status,
             int retryCount,
             Instant createdAt,
             Instant publishedAt,

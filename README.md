@@ -1,7 +1,18 @@
 # event-pof
 
-Event-driven proof of concept using the **Inbox Pattern** over Apache Kafka.
+Event-driven proof of concept using the **Transactional Outbox Pattern** over Apache Kafka.
 Two independent services share a common domain library and communicate exclusively through Kafka topics.
+
+**Why Outbox and not Inbox?** The producer never publishes to Kafka on the request thread. It durably
+persists the event to its own MongoDB collection (`outbox_events`) and returns `202 Accepted`; a separate
+scheduled relay then polls that collection and publishes to the broker. Writing outgoing messages to a
+local store and draining it with a relay is the **Outbox** pattern (service → broker), specifically the
+*Polling Publisher* variant. An **Inbox** is the mirror image — a *receiving* service persisting incoming
+messages before processing them to guarantee idempotency (broker → service).
+
+Both halves are present here: `event-producer` implements the outbox, and `event-consumer` covers the
+inbox-side concern through its `processed_events` collection, which deduplicates on `eventKey` so a
+redelivered Kafka message is processed exactly once.
 
 ### Stack
 
@@ -23,24 +34,24 @@ Two independent services share a common domain library and communicate exclusive
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           event-producer  (Spring Boot 4.1 · port 8080)    │
+│                          event-producer  (Spring Boot 4.1 · port 8080)      │
 │                                                                             │
 │  REST POST /api/v1/events                                                   │
-│  REST GET  /api/v1/events/{inboxId}/status                                  │
+│  REST GET  /api/v1/events/{outboxId}/status                                 │
 │         │                                                                   │
 │         ▼                                                                   │
-│  ┌─────────────┐   idempotent save   ┌──────────────────┐                  │
-│  │ Ingestion   │ ──────────────────► │  inbox_events    │  (MongoDB)        │
-│  │ Service     │                     │  status=PENDING  │                   │
-│  └─────────────┘                     └──────────────────┘                  │
-│                                               │                             │
+│  ┌─────────────┐   idempotent save    ┌──────────────────┐                  │
+│  │ Ingestion   │ ───────────────────► │  outbox_events   │  (MongoDB)       │
+│  │ Service     │                      │  status=PENDING  │                  │
+│  └─────────────┘                      └──────────────────┘                  │
+│                                                │                            │
 │                                  findAndModify (atomic claim)               │
-│                                  scheduler every 5 s                       │
-│                                               │                             │
-│  ┌─────────────┐   publish + timeout  ┌───────▼──────────┐                 │
-│  │ InboxRelay  │ ────────────────────►│  Kafka Producer  │  3x retry       │
-│  │ Service     │                      │  events.domain   │  + 5 s timeout  │
-│  └─────────────┘                      └──────────────────┘                 │
+│                                  scheduler every 5 s                        │
+│                                                │                            │
+│  ┌─────────────┐   publish + timeout  ┌────────▼─────────┐                  │
+│  │ OutboxRelay │ ────────────────────►│  Kafka Producer  │  3x retry        │
+│  │ Service     │                      │  events.domain   │  + 5 s timeout   │
+│  └─────────────┘                      └──────────────────┘                  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                                │
                                    Kafka topic: events.domain
@@ -145,18 +156,18 @@ Invoke-WebRequest -Uri "http://localhost:8080/api/v1/events" -Method POST `
 Expected response (`202 Accepted`):
 ```json
 {
-  "inboxId": "665f1a2b3c4d5e6f7a8b9c0d",
+  "outboxId": "665f1a2b3c4d5e6f7a8b9c0d",
   "eventKey": "ord-001",
   "message": "Event accepted for processing"
 }
 ```
 
-Within ~5 seconds the `InboxRelayService` picks up the event, publishes it to Kafka, and the consumer processes and persists it.
+Within ~5 seconds the `OutboxRelayService` picks up the event, publishes it to Kafka, and the consumer processes and persists it.
 
 ### 4 — Check event status
 
 ```bash
-curl http://localhost:8080/api/v1/events/{inboxId}/status
+curl http://localhost:8080/api/v1/events/{outboxId}/status
 ```
 
 ### 5 — Verify end-to-end
@@ -210,32 +221,32 @@ event-common/src/main/java/com/eventpof/common/
 
 ### event-producer  _(Spring Boot 4.1)_
 
-Accepts events via REST and guarantees at-least-once delivery to Kafka using the **Inbox Pattern**.
+Accepts events via REST and guarantees at-least-once delivery to Kafka using the **Outbox Pattern**.
 
 ```
 src/main/java/com/eventpof/producer/
 ├── api/
 │   ├── EventController.java          POST /api/v1/events → 202 Accepted
-│   │                                 GET  /api/v1/events/{inboxId}/status → 200 | 404
+│   │                                 GET  /api/v1/events/{outboxId}/status → 200 | 404
 │   └── GlobalExceptionHandler.java   RFC 9457 ProblemDetail responses
-├── domain/inbox/
-│   ├── InboxEvent.java               MongoDB document (status machine)
-│   ├── InboxEventRepository.java     Spring Data interface
-│   └── InboxEventStatus.java         PENDING → IN_PROGRESS → PUBLISHED | FAILED
+├── domain/outbox/
+│   ├── OutboxEvent.java              MongoDB document (status machine)
+│   ├── OutboxEventRepository.java    Spring Data interface
+│   └── OutboxEventStatus.java        PENDING → IN_PROGRESS → PUBLISHED | FAILED
 ├── service/
-│   ├── EventIngestionService.java    validates + saves to inbox (idempotent on eventKey)
-│   ├── EventStatusService.java       reads inbox event by id
-│   └── InboxRelayService.java        @Scheduled — atomic claim via findAndModify
+│   ├── EventIngestionService.java    validates + saves to outbox (idempotent on eventKey)
+│   ├── EventStatusService.java       reads outbox event by id
+│   └── OutboxRelayService.java       @Scheduled — atomic claim via findAndModify
 └── infrastructure/kafka/
     ├── KafkaEventPublisher.java       CompletableFuture + orTimeout(5s)
     └── KafkaProducerConfig.java       idempotent producer, acks=all, 3 retries
 ```
 
-**Inbox pattern flow (atomic claim — race-condition safe):**
+**Outbox pattern flow (atomic claim — race-condition safe):**
 
 ```
 POST /events
-    → save InboxEvent(status=PENDING) to MongoDB   ← guaranteed durable write
+    → save OutboxEvent(status=PENDING) to MongoDB   ← guaranteed durable write
     ← 202 Accepted
 
 every 5 s:
@@ -246,11 +257,13 @@ every 5 s:
         on failure → mark FAILED, retryCount++
 ```
 
-**Idempotency:** duplicate `eventKey` returns the existing `inboxId` without re-saving.
+**Idempotency:** duplicate `eventKey` returns the existing `outboxId` without re-saving.
 
 ### event-consumer  _(Micronaut 4.7)_
 
 Consumes `events.domain`, processes with 3-retry policy, routes failures to DLT.
+This is the **inbox side** of the flow: `processed_events` records every handled `eventKey`, so a
+Kafka redelivery (at-least-once) is skipped rather than processed twice.
 
 ```
 src/main/java/com/eventpof/consumer/
@@ -270,7 +283,7 @@ src/main/java/com/eventpof/consumer/
 
 ## Retry and fault tolerance
 
-### Producer side (Inbox → Kafka)
+### Producer side (Outbox → Kafka)
 
 Dwie niezależne warstwy retry — każda obsługuje inny rodzaj błędu:
 
@@ -279,12 +292,15 @@ Dwie niezależne warstwy retry — każda obsługuje inny rodzaj błędu:
 Kafka producer: retries=3, retry.backoff.ms=1000, acks=all, enable.idempotence=true
 ```
 
-**Warstwa 2 — Inbox exponential backoff** (sekundy–minuty, długie awarie):
+**Warstwa 2 — Outbox exponential backoff** (sekundy–minuty, długie awarie):
+
+`MAX_RETRY = 3` oznacza **3 próby publikacji łącznie** (1 pierwsza + 2 ponowienia).
+`markFailed()` inkrementuje `retryCount` *przed* sprawdzeniem limitu (`retryCount < MAX_RETRY`),
+więc trzecia nieudana próba kończy się od razu statusem `FAILED`:
 ```
-attempt 1 → fail → PENDING, nextRetryAt: now + 30s
-attempt 2 → fail → PENDING, nextRetryAt: now + 120s
-attempt 3 → fail → PENDING, nextRetryAt: now + 480s
-attempt 4 → fail → FAILED (permanentnie)
+próba 1 → fail → retryCount=1 → PENDING, nextRetryAt: now + 30s   (30 · 4⁰)
+próba 2 → fail → retryCount=2 → PENDING, nextRetryAt: now + 120s  (30 · 4¹)
+próba 3 → fail → retryCount=3 → FAILED (permanentnie)
 ```
 
 `claimNextPending()` uwzględnia `nextRetryAt` — event nie jest podjęty przed upływem backoffu:
@@ -301,12 +317,14 @@ find { status: IN_PROGRESS, updatedAt < 60s ago }
 → reset to PENDING, retryCount++
 ```
 
-`InboxEvent` status machine:
+Uwaga: stuck detector również robi `retryCount++`, więc crash zużywa jedną z trzech prób.
+
+`OutboxEvent` status machine:
 ```
 PENDING ──► IN_PROGRESS ──► PUBLISHED
                 │
-                └──► PENDING (retry < 4, z backoffem)
-                └──► FAILED  (retry = 4, permanentnie)
+                └──► PENDING (retryCount < 3, z backoffem)
+                └──► FAILED  (retryCount = 3, permanentnie)
 ```
 
 ### Consumer side (Kafka → processing)
@@ -343,7 +361,7 @@ Integration tests use `TestPropertyProvider` — Micronaut-idiomatic pattern tha
 | Test class | Type | What it covers |
 |---|---|---|
 | `EventIngestionServiceTest` | Unit (Mockito) | Idempotency, auditData creation, correlationId generation |
-| `InboxRelayServiceTest` | Unit (Mockito) | Publish success, backoff on failure, max retry boundary, empty inbox, stuck detector |
+| `OutboxRelayServiceTest` | Unit (Mockito) | Publish success, backoff on failure, max retry boundary, empty outbox, stuck detector |
 | `EventProcessorServiceTest` | Unit (Mockito) | Process new event, skip duplicate, DLT save, DLT dedup |
 | `KafkaEventConsumerIntegrationTest` | Integration (TestContainers) | E2E consume, duplicate skip, DLT routing |
 
@@ -384,7 +402,7 @@ Prometheus scrapes both every 15 s.
 | `SPRING_PROFILES_ACTIVE` | — | Set to `docker` when running in container |
 | `spring.data.mongodb.uri` | `mongodb://...localhost:27017/...` | MongoDB connection |
 | `spring.kafka.bootstrap-servers` | `localhost:9092` | Kafka brokers |
-| `inbox.relay.interval-ms` | `5000` | Relay scheduler interval (ms) |
+| `outbox.relay.interval-ms` | `5000` | Relay scheduler interval (ms) |
 | `LOKI_URL` | `http://localhost:3100` | Loki push endpoint |
 
 ### event-consumer
@@ -407,7 +425,7 @@ event-pof/
 │
 ├── event-common/                  shared domain (no framework)
 │
-├── event-producer/                Spring Boot 4.1 — REST + Inbox Pattern
+├── event-producer/                Spring Boot 4.1 — REST + Outbox Pattern
 │   ├── Dockerfile
 │   ├── src/main/resources/
 │   │   ├── application.yml

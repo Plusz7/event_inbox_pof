@@ -1,4 +1,4 @@
-package com.eventpof.producer.domain.inbox;
+package com.eventpof.producer.domain.outbox;
 
 import com.eventpof.common.domain.EventPayload;
 import lombok.Builder;
@@ -11,8 +11,8 @@ import java.time.Instant;
 
 @Data
 @Builder
-@Document(collection = "inbox_events")
-public class InboxEvent {
+@Document(collection = "outbox_events")
+public class OutboxEvent {
 
     @Id
     private String id;
@@ -23,7 +23,7 @@ public class InboxEvent {
     private EventPayload payload;
 
     @Indexed
-    private InboxEventStatus status;
+    private OutboxEventStatus status;
 
     private int retryCount;
     private Instant createdAt;
@@ -32,12 +32,12 @@ public class InboxEvent {
     private Instant nextRetryAt;
     private String lastError;
 
-    public static InboxEvent fromPayload(EventPayload payload) {
+    public static OutboxEvent fromPayload(EventPayload payload) {
         Instant now = Instant.now();
-        return InboxEvent.builder()
+        return OutboxEvent.builder()
                 .eventKey(payload.eventKey())
                 .payload(payload)
-                .status(InboxEventStatus.PENDING)
+                .status(OutboxEventStatus.PENDING)
                 .retryCount(0)
                 .createdAt(now)
                 .updatedAt(now)
@@ -46,7 +46,7 @@ public class InboxEvent {
     }
 
     public void markPublished() {
-        this.status = InboxEventStatus.PUBLISHED;
+        this.status = OutboxEventStatus.PUBLISHED;
         this.publishedAt = Instant.now();
         this.updatedAt = Instant.now();
     }
@@ -54,12 +54,12 @@ public class InboxEvent {
     public void markFailed(String error) {
         this.retryCount++;
         this.lastError = error;
-        this.status = InboxEventStatus.FAILED;
+        this.status = OutboxEventStatus.FAILED;
         this.updatedAt = Instant.now();
     }
 
     public void scheduleRetry(Instant nextRetryAt) {
-        this.status = InboxEventStatus.PENDING;
+        this.status = OutboxEventStatus.PENDING;
         this.nextRetryAt = nextRetryAt;
         this.updatedAt = Instant.now();
     }

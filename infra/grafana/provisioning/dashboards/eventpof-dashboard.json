@@ -238,14 +238,14 @@
     },
     {
       "id": 11,
-      "title": "Inbox Events — Status Counts",
+      "title": "Outbox Events — Status Counts",
       "type": "stat",
       "gridPos": { "x": 12, "y": 32, "w": 12, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "mongodb_collection_count{collection=\"inbox_events\", instance=~\"$instance\"}",
-          "legendFormat": "Total Inbox"
+          "expr": "mongodb_collection_count{collection=\"outbox_events\", instance=~\"$instance\"}",
+          "legendFormat": "Total Outbox"
         }
       ],
       "fieldConfig": {
