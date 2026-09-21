@@ -28,7 +28,7 @@ public class ProcessedEvent {
     private String eventKey;
 
     @MappedProperty("payload")
-    private EventPayload payload;
+    private ProcessedPayload payload;
 
     @MappedProperty("status")
     private ProcessedEventStatus status;
@@ -45,7 +45,7 @@ public class ProcessedEvent {
     public static ProcessedEvent success(EventPayload payload, int attempts) {
         return ProcessedEvent.builder()
                 .eventKey(payload.eventKey())
-                .payload(payload)
+                .payload(ProcessedPayload.from(payload))
                 .status(ProcessedEventStatus.SUCCESS)
                 .attemptCount(attempts)
                 .processedAt(Instant.now())
@@ -55,7 +55,7 @@ public class ProcessedEvent {
     public static ProcessedEvent deadLetter(EventPayload payload, int attempts, String error) {
         return ProcessedEvent.builder()
                 .eventKey(payload.eventKey())
-                .payload(payload)
+                .payload(ProcessedPayload.from(payload))
                 .status(ProcessedEventStatus.DEAD_LETTER)
                 .attemptCount(attempts)
                 .processedAt(Instant.now())

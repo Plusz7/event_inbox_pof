@@ -12,7 +12,7 @@ kafka:
   topics:
     events: events.domain
 
-inbox:
+outbox:
   relay:
     interval-ms: 5000
 

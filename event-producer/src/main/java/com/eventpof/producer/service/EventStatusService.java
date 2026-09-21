@@ -1,7 +1,7 @@
 package com.eventpof.producer.service;
 
-import com.eventpof.producer.domain.inbox.InboxEvent;
-import com.eventpof.producer.domain.inbox.InboxEventRepository;
+import com.eventpof.producer.domain.outbox.OutboxEvent;
+import com.eventpof.producer.domain.outbox.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,9 +11,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class EventStatusService {
 
-    private final InboxEventRepository inboxEventRepository;
+    private final OutboxEventRepository outboxEventRepository;
 
-    public Optional<InboxEvent> findById(String inboxId) {
-        return inboxEventRepository.findById(inboxId);
+    public Optional<OutboxEvent> findById(String outboxId) {
+        return outboxEventRepository.findById(outboxId);
     }
 }

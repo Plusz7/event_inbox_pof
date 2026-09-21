@@ -1,8 +1,8 @@
 package com.eventpof.producer.service;
 
 import com.eventpof.common.dto.EventRequest;
-import com.eventpof.producer.domain.inbox.InboxEvent;
-import com.eventpof.producer.domain.inbox.InboxEventRepository;
+import com.eventpof.producer.domain.outbox.OutboxEvent;
+import com.eventpof.producer.domain.outbox.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -21,13 +21,13 @@ import static org.mockito.Mockito.*;
 class EventIngestionServiceTest {
 
     @Mock
-    private InboxEventRepository inboxEventRepository;
+    private OutboxEventRepository outboxEventRepository;
 
     @InjectMocks
     private EventIngestionService ingestionService;
 
     @Test
-    void shouldSaveEventToInbox() {
+    void shouldSaveEventToOutbox() {
         EventRequest request = EventRequest.builder()
                 .eventKey("key-001")
                 .eventType("ORDER_CREATED")
@@ -37,21 +37,21 @@ class EventIngestionServiceTest {
                 .data(Map.of("value", "test"))
                 .build();
 
-        InboxEvent savedEvent = InboxEvent.builder().id("inbox-id-1").eventKey("key-001").build();
-        when(inboxEventRepository.existsByEventKey("key-001")).thenReturn(false);
-        when(inboxEventRepository.save(any())).thenReturn(savedEvent);
+        OutboxEvent savedEvent = OutboxEvent.builder().id("outbox-id-1").eventKey("key-001").build();
+        when(outboxEventRepository.existsByEventKey("key-001")).thenReturn(false);
+        when(outboxEventRepository.save(any())).thenReturn(savedEvent);
 
         String id = ingestionService.ingest(request);
 
-        assertThat(id).isEqualTo("inbox-id-1");
-        ArgumentCaptor<InboxEvent> captor = ArgumentCaptor.forClass(InboxEvent.class);
-        verify(inboxEventRepository).save(captor.capture());
+        assertThat(id).isEqualTo("outbox-id-1");
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository).save(captor.capture());
         assertThat(captor.getValue().getEventKey()).isEqualTo("key-001");
         assertThat(captor.getValue().getPayload().auditData().createdBy()).isEqualTo("user@example.com");
     }
 
     @Test
-    void shouldReturnExistingInboxIdForDuplicateKey() {
+    void shouldReturnExistingOutboxIdForDuplicateKey() {
         EventRequest request = EventRequest.builder()
                 .eventKey("dup-key")
                 .eventType("TEST")
@@ -60,14 +60,14 @@ class EventIngestionServiceTest {
                 .data(Map.of())
                 .build();
 
-        InboxEvent existing = InboxEvent.builder().id("existing-id").eventKey("dup-key").build();
-        when(inboxEventRepository.existsByEventKey("dup-key")).thenReturn(true);
-        when(inboxEventRepository.findByEventKey("dup-key")).thenReturn(Optional.of(existing));
+        OutboxEvent existing = OutboxEvent.builder().id("existing-id").eventKey("dup-key").build();
+        when(outboxEventRepository.existsByEventKey("dup-key")).thenReturn(true);
+        when(outboxEventRepository.findByEventKey("dup-key")).thenReturn(Optional.of(existing));
 
         String id = ingestionService.ingest(request);
 
         assertThat(id).isEqualTo("existing-id");
-        verify(inboxEventRepository, never()).save(any());
+        verify(outboxEventRepository, never()).save(any());
     }
 
     @Test
@@ -80,14 +80,14 @@ class EventIngestionServiceTest {
                 .data(Map.of())
                 .build();
 
-        InboxEvent savedEvent = InboxEvent.builder().id("id-no-corr").eventKey("key-no-corr").build();
-        when(inboxEventRepository.existsByEventKey(any())).thenReturn(false);
-        when(inboxEventRepository.save(any())).thenReturn(savedEvent);
+        OutboxEvent savedEvent = OutboxEvent.builder().id("id-no-corr").eventKey("key-no-corr").build();
+        when(outboxEventRepository.existsByEventKey(any())).thenReturn(false);
+        when(outboxEventRepository.save(any())).thenReturn(savedEvent);
 
         ingestionService.ingest(request);
 
-        ArgumentCaptor<InboxEvent> captor = ArgumentCaptor.forClass(InboxEvent.class);
-        verify(inboxEventRepository).save(captor.capture());
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository).save(captor.capture());
         assertThat(captor.getValue().getPayload().auditData().correlationId()).isNotBlank();
     }
 }

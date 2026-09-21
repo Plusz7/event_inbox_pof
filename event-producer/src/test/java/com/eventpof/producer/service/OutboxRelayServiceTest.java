@@ -2,9 +2,9 @@ package com.eventpof.producer.service;
 
 import com.eventpof.common.domain.AuditData;
 import com.eventpof.common.domain.EventPayload;
-import com.eventpof.producer.domain.inbox.InboxEvent;
-import com.eventpof.producer.domain.inbox.InboxEventRepository;
-import com.eventpof.producer.domain.inbox.InboxEventStatus;
+import com.eventpof.producer.domain.outbox.OutboxEvent;
+import com.eventpof.producer.domain.outbox.OutboxEventRepository;
+import com.eventpof.producer.domain.outbox.OutboxEventStatus;
 import com.eventpof.producer.infrastructure.kafka.KafkaEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,10 +22,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class InboxRelayServiceTest {
+class OutboxRelayServiceTest {
 
     @Mock
-    private InboxEventRepository inboxEventRepository;
+    private OutboxEventRepository outboxEventRepository;
 
     @Mock
     private KafkaEventPublisher kafkaEventPublisher;
@@ -34,12 +34,12 @@ class InboxRelayServiceTest {
     private MongoTemplate mongoTemplate;
 
     @InjectMocks
-    private InboxRelayService relayService;
+    private OutboxRelayService relayService;
 
     @Test
     void shouldPublishPendingEventsAndMarkAsPublished() {
-        InboxEvent event = buildPendingEvent("key-1");
-        when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
+        OutboxEvent event = buildPendingEvent("key-1");
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(OutboxEvent.class)))
                 .thenReturn(event)
                 .thenReturn(null);
         when(kafkaEventPublisher.publish(any()))
@@ -47,14 +47,14 @@ class InboxRelayServiceTest {
 
         relayService.relay();
 
-        assertThat(event.getStatus()).isEqualTo(InboxEventStatus.PUBLISHED);
-        verify(inboxEventRepository).save(event);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
+        verify(outboxEventRepository).save(event);
     }
 
     @Test
     void shouldScheduleRetryWithBackoffOnPublishError() {
-        InboxEvent event = buildPendingEvent("key-fail");
-        when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
+        OutboxEvent event = buildPendingEvent("key-fail");
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(OutboxEvent.class)))
                 .thenReturn(event)
                 .thenReturn(null);
         CompletableFuture<SendResult<String, EventPayload>> failedFuture = new CompletableFuture<>();
@@ -64,21 +64,21 @@ class InboxRelayServiceTest {
         relayService.relay();
 
         assertThat(event.getRetryCount()).isEqualTo(1);
-        assertThat(event.getStatus()).isEqualTo(InboxEventStatus.PENDING);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
         assertThat(event.getNextRetryAt()).isAfter(Instant.now());
-        verify(inboxEventRepository).save(event);
+        verify(outboxEventRepository).save(event);
     }
 
     @Test
     void shouldLeaveEventFailedAfterMaxRetries() {
-        InboxEvent event = buildPendingEvent("key-max");
+        OutboxEvent event = buildPendingEvent("key-max");
         // simulate 3 previous failures
         event.markFailed("err1");
         event.markFailed("err2");
         event.markFailed("err3");
         event.scheduleRetry(Instant.now());
 
-        when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(OutboxEvent.class)))
                 .thenReturn(event)
                 .thenReturn(null);
         CompletableFuture<SendResult<String, EventPayload>> failedFuture = new CompletableFuture<>();
@@ -87,42 +87,42 @@ class InboxRelayServiceTest {
 
         relayService.relay();
 
-        assertThat(event.getStatus()).isEqualTo(InboxEventStatus.FAILED);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.FAILED);
     }
 
     @Test
     void shouldDoNothingWhenNoPendingEvents() {
-        when(mongoTemplate.findAndModify(any(), any(), any(), eq(InboxEvent.class)))
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(OutboxEvent.class)))
                 .thenReturn(null);
 
         relayService.relay();
 
         verify(kafkaEventPublisher, never()).publish(any());
-        verify(inboxEventRepository, never()).save(any());
+        verify(outboxEventRepository, never()).save(any());
     }
 
     @Test
     void shouldResetStuckInProgressEvents() {
-        when(mongoTemplate.updateMulti(any(), any(), eq(InboxEvent.class)))
+        when(mongoTemplate.updateMulti(any(), any(), eq(OutboxEvent.class)))
                 .thenReturn(mock(com.mongodb.client.result.UpdateResult.class));
 
         relayService.resetStuckEvents();
 
-        verify(mongoTemplate).updateMulti(any(), any(), eq(InboxEvent.class));
+        verify(mongoTemplate).updateMulti(any(), any(), eq(OutboxEvent.class));
     }
 
-    private InboxEvent buildPendingEvent(String key) {
+    private OutboxEvent buildPendingEvent(String key) {
         EventPayload payload = EventPayload.builder()
                 .eventKey(key)
                 .eventType("TEST")
                 .auditData(AuditData.of("user", "corr", "src"))
                 .build();
         Instant now = Instant.now();
-        return InboxEvent.builder()
+        return OutboxEvent.builder()
                 .id("id-" + key)
                 .eventKey(key)
                 .payload(payload)
-                .status(InboxEventStatus.PENDING)
+                .status(OutboxEventStatus.PENDING)
                 .retryCount(0)
                 .createdAt(now)
                 .updatedAt(now)

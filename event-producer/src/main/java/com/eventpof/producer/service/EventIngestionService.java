@@ -3,8 +3,8 @@ package com.eventpof.producer.service;
 import com.eventpof.common.domain.AuditData;
 import com.eventpof.common.domain.EventPayload;
 import com.eventpof.common.dto.EventRequest;
-import com.eventpof.producer.domain.inbox.InboxEvent;
-import com.eventpof.producer.domain.inbox.InboxEventRepository;
+import com.eventpof.producer.domain.outbox.OutboxEvent;
+import com.eventpof.producer.domain.outbox.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,14 +16,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EventIngestionService {
 
-    private final InboxEventRepository inboxEventRepository;
+    private final OutboxEventRepository outboxEventRepository;
 
     public String ingest(EventRequest request) {
-        if (inboxEventRepository.existsByEventKey(request.eventKey())) {
+        if (outboxEventRepository.existsByEventKey(request.eventKey())) {
             log.warn("Duplicate event key detected: {}", request.eventKey());
-            return inboxEventRepository.findByEventKey(request.eventKey())
-                    .map(InboxEvent::getId)
-                    .orElseThrow(() -> new IllegalStateException("Inbox event not found for key: " + request.eventKey()));
+            return outboxEventRepository.findByEventKey(request.eventKey())
+                    .map(OutboxEvent::getId)
+                    .orElseThrow(() -> new IllegalStateException("Outbox event not found for key: " + request.eventKey()));
         }
 
         String correlationId = request.correlationId() != null
@@ -39,10 +39,10 @@ public class EventIngestionService {
                 .data(request.data())
                 .build();
 
-        InboxEvent inboxEvent = InboxEvent.fromPayload(payload);
-        InboxEvent saved = inboxEventRepository.save(inboxEvent);
+        OutboxEvent outboxEvent = OutboxEvent.fromPayload(payload);
+        OutboxEvent saved = outboxEventRepository.save(outboxEvent);
 
-        log.info("Event saved to inbox: id={}, key={}", saved.getId(), saved.getEventKey());
+        log.info("Event saved to outbox: id={}, key={}", saved.getId(), saved.getEventKey());
         return saved.getId();
     }
 }
