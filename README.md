@@ -271,13 +271,23 @@ src/main/java/com/eventpof/consumer/
 ├── domain/processed/
 │   ├── ProcessedEvent.java                 @MappedEntity — Micronaut Data MongoDB entity
 │   ├── ProcessedEventRepository.java       @MongoRepository — compile-time generated queries
-│   └── ProcessedEventStatus.java           SUCCESS | FAILED | DEAD_LETTER
+│   ├── ProcessedEventStatus.java           SUCCESS | FAILED | DEAD_LETTER
+│   ├── ProcessedPayload.java               @Serdeable mirror of EventPayload (persistence model)
+│   └── ProcessedAudit.java                 @Serdeable mirror of AuditData
 ├── service/
 │   └── EventProcessorService.java          @Singleton, idempotent on eventKey
 └── infrastructure/kafka/
     ├── KafkaEventConsumer.java             @KafkaListener, implements KafkaListenerExceptionHandler
     └── DltEventProducer.java               @KafkaClient — publishes to events.domain.DLT
 ```
+
+**Why mirror `EventPayload` instead of persisting it directly?** Micronaut Data MongoDB writes
+entities through `micronaut-serde`, which needs compile-time `@Serdeable` metadata on every nested
+type. Annotating `EventPayload` in place would push a Micronaut annotation into `event-common` —
+a module that is deliberately framework-neutral and shared with the Spring Boot producer, and whose
+`@JsonFormat` wire-contract annotations `micronaut-serde` rejects. Mapping to a consumer-owned
+`ProcessedPayload` keeps that boundary intact and lets the stored shape evolve independently of the
+Kafka wire contract.
 
 ---
 
